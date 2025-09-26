@@ -1,0 +1,41 @@
+# cloudbuild.yaml
+
+# Either delete this line and pick the deployer SA in the trigger UI,
+# or set it to your deployer SA (NOT news-runner):
+# serviceAccount: ci-deployer@active-chimera-466815-p7.iam.gserviceaccount.com
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _IMAGE: gcr.io/${PROJECT_ID}/news-collector
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'Dockerfile', '-t', '${_IMAGE}:$SHORT_SHA', '.']
+
+  - name: gcr.io/cloud-builders/docker
+    args: ['push', '${_IMAGE}:$SHORT_SHA']
+
+  # (optional) also tag/push latest
+  - name: gcr.io/cloud-builders/docker
+    args: ['tag', '${_IMAGE}:$SHORT_SHA', '${_IMAGE}:latest']
+  - name: gcr.io/cloud-builders/docker
+    args: ['push', '${_IMAGE}:latest']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      [
+        'run','deploy','news-collector',
+        '--image','${_IMAGE}:$SHORT_SHA',
+        '--platform','managed',
+        '--region','europe-west2',
+        '--service-account','news-runner@active-chimera-466815-p7.iam.gserviceaccount.com',
+        '--allow-unauthenticated',
+        '--quiet'
+      ]
+
+images:
+  - '${_IMAGE}:$SHORT_SHA'
+  - '${_IMAGE}:latest'

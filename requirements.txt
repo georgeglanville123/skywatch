@@ -1,0 +1,7 @@
+flask==2.3.2
+httpx>=0.28.1,<1.0.0
+trafilatura==1.12.2
+google-generativeai==0.5.1
+gunicorn==20.1.0
+gspread>=5.0
+google-auth>=2.0
