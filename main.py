@@ -434,12 +434,11 @@ def llm_relevance_filter(items: list, gemini_key: str,
     genai.configure(api_key=gemini_key)
     model = genai.GenerativeModel(model_name)
 
-
     prompt_template = Template(
         "You are a strict filter for news about telecom operators (CSPs) "
         "using generative AI (GenAI/LLMs) for deployments, pilots, rollouts, or implementations.\n\n"
         "Return ONLY valid JSON in this exact shape:\n"
-        "partnering, piloting  or rolling out sattelite services\": \"<=20 words\"}\n\n"
+        "{\"relevant\": true/false, \"reason\": \"<=20 words\"}\n\n"
         "Text to review (truncated):\n"
         "\"\"\"$article\"\"\""
     )
@@ -524,7 +523,7 @@ def llm_extract_structured(items: list, gemini_key: str,
 
 # ------------------ Google Sheets Setup (lazy) ------------------
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1YRIXgBdft3PaJJrOLVjWudPTUXk8jfljNq7EkWtGtCY"
+SPREADSHEET_ID = "1okvGtFwS6DaJ4uJnb69D5mB-Gn6NmkE1tpTfj-eh79M"
 WORKSHEET_NAME = "NewsData"
 
 def _get_gs_client():
