@@ -31,7 +31,7 @@ steps:
         '--image','${_IMAGE}:$SHORT_SHA',
         '--platform','managed',
         '--region','europe-west2',
-        '--service-account','news-runner@active-chimera-466815-p7.iam.gserviceaccount.com',
+        '--service-account','803176803882-compute@developer.gserviceaccount.com',
         '--allow-unauthenticated',
         '--quiet'
       ]
