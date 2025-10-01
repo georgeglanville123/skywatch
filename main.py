@@ -23,8 +23,9 @@ from email.utils import parsedate_to_datetime
 
 # ────────────────────────── Config ──────────────────────────
 TERM_GROUPS = [{
-    "ai":  ["generative AI", "GenAI", "large language model", "LLM"],
-    "act": ["deployment", "implementation", "pilot", "rollout"]
+    "ai":  ["NTN", "Low Earth Orbit (LEO)", "Medium Earth Orbit (MEO)", "Geostationary Orbit (GEO)", "Multi-orbit", "High-altitude platform station (HAPS)", "Unmanned aerial vehicle (UAV)", "Satellite", "direct-to-device (D2D)", "terrestrial network", "Non-terrestrial network (NTN)", "direct-to-handset (D2H)", "direct-to-cell (D2H)", "constellation", "spectrum", "MSS"
+],
+    "act": ["partnership", "implementation", "pilot", "rollout"]
 }]
 
 # Refined list (100)
@@ -438,7 +439,7 @@ def llm_relevance_filter(items: list, gemini_key: str,
         "You are a strict filter for news about telecom operators (CSPs) "
         "using generative AI (GenAI/LLMs) for deployments, pilots, rollouts, or implementations.\n\n"
         "Return ONLY valid JSON in this exact shape:\n"
-        "{\"relevant\": true/false, \"reason\": \"<=20 words\"}\n\n"
+        "partnering, piloting  or rolling out sattelite services\": \"<=20 words\"}\n\n"
         "Text to review (truncated):\n"
         "\"\"\"$article\"\"\""
     )
