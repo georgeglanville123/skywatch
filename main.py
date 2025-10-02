@@ -29,23 +29,15 @@ TERM_GROUPS = [{
 }]
 
 # Refined list (100)
+
 COMPANIES = [
-    "AIS", "Altice", "America Movil", "AT&T", "Axiata", "Bell Canada", "Bharti Airtel",
-    "Bouygues Telecom", "BT", "Charter Communications", "China Mobile", "China Telecom",
-    "China Unicom", "Chunghwa Telecom", "CK Hutchison", "Comcast", "Cox Communications",
-    "CYTA", "Deutsche Telekom", "du", "e&", "Elisa", "Entel",
-    "Ethio Telecom", "Globe Telecom", "Iliad", "KDDI", "KPN", "KT", "LG Uplus",
-    "Liberty Global", "Lumen Technologies", "MASMOVIL", "Maxis", "Millicom", "MTN",
-    "NTT Docomo", "Omantel", "Ooredoo", "Orange", "PTCL", "PLDT", "Proximus",
-    "Rakuten Mobile", "Reliance Jio", "Rogers Communications", "Safaricom", "stc",
-    "Singtel", "SK Telecom", "SoftBank", "Spark New Zealand", "Sprint", "StarHub",
-    "Sunrise Communications", "Swisscom", "Taiwan Mobile", "Tata Communications", "Tele2",
-    "Telecom Argentina", "Telecom Egypt", "TIM", "Telefonica", "A1 Telekom Austria",
-    "Telekom Malaysia", "Telenet", "Telenor", "Telia", "Telkom (South Africa)",
-    "Telkom Indonesia", "Telstra", "Telus", "TPG Telecom", "Turkcell", "Veon", "Verizon",
-    "Viettel", "Virgin Media O2", "Vodafone", "Wind Tre", "Zain", "T-Mobile US", "Vodacom",
-    "Telkomsel", "Indosat Ooredoo Hutchison", "TIM Brasil", "Vivo", "Claro", "Mobily",
-    "Airtel Africa"
+    "Amazon Kuiper", "AST SpaceMobile", "China Mobile", "China Satcom",
+    "China Satellite Network Group", "Eutelsat OneWeb", "Eutelsat (excluding OneWeb)",
+    "GalaxySpace", "GlobalStar", "Intelsat", "KT SAT", "Lynk Global", "Rivada",
+    "Sateliot", "SatMENA", "Sceye", "Sky Perfect JSAT", "Skylo", "Starlink",
+    "Telesat", "Yahsat", "SES", "Astranis", "Echostar", "Thaicom",
+    "OQ Technology", "Iridium", "Rivada Space Networks",
+    "China Telecom Satellite Communications"
 ]
 
 BINARY_EXTS = (".pdf", ".ppt", ".pptx", ".doc", ".docx", ".xls", ".xlsx")
@@ -436,7 +428,7 @@ def llm_relevance_filter(items: list, gemini_key: str,
 
     prompt_template = Template(
         "You are a strict filter for news about telecom operators (CSPs) "
-        "using generative AI (GenAI/LLMs) for deployments, pilots, rollouts, or implementations.\n\n"
+        "partnering with NTN / satellite connectivity players for deployments, pilots, rollouts, or implementations.\n\n"
         "Return ONLY valid JSON in this exact shape:\n"
         "{\"relevant\": true/false, \"reason\": \"<=20 words\"}\n\n"
         "Text to review (truncated):\n"
@@ -484,8 +476,8 @@ def llm_extract_structured(items: list, gemini_key: str,
     prompt_schema = Template(
         "Extract these fields from the article text:\n"
         "- company: primary telecom operator or vendor\n"
-        "- technology: GenAI/LLM used\n"
-        "- activity: deployment, pilot, rollout, etc.\n"
+        "- technology: NTN / satellite technology used\n"
+        "- activity: partnership, deployment, pilot, rollout, etc.\n"
         "- summary: <=40 words\n\n"
         "Return ONLY valid JSON in this exact shape:\n"
         "{\"company\":\"…\",\"technology\":\"…\",\"activity\":\"…\",\"summary\":\"…\"}\n\n"
