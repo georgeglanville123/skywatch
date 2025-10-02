@@ -52,7 +52,7 @@ GEMINI_MODEL          = "gemini-1.5-flash"
 
 # Time filtering knobs
 TIME_MODE = os.getenv("TIME_MODE", "calendar")  # "calendar" or "rolling"
-TIME_DAYS = max(1, int(os.getenv("TIME_DAYS", "7")))  # guard against 0/negatives
+TIME_DAYS = max(1, int(os.getenv("TIME_DAYS", "30")))  # guard against 0/negatives
 TIME_ZONE = "Europe/London"                     # used for calendar mode
 
 # CSE pacing
