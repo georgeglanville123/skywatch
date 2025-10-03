@@ -23,7 +23,7 @@ from email.utils import parsedate_to_datetime
 
 # ────────────────────────── Config ──────────────────────────
 TERM_GROUPS = [{
-    "ai":  ["NTN", "Low Earth Orbit (LEO)", "Medium Earth Orbit (MEO)", "Geostationary Orbit (GEO)", "Multi-orbit", "High-altitude platform station (HAPS)", "Unmanned aerial vehicle (UAV)", "Satellite", "direct-to-device (D2D)", "terrestrial network", "Non-terrestrial network (NTN)", "direct-to-handset (D2H)", "direct-to-cell (D2H)", "constellation", "spectrum", "MSS"
+    "ai":  ["NTN", "Low Earth Orbit", "LEO", "Medium Earth Orbit", "MEO", "Geostationary Orbit", "GEO", "Multi-orbit", "High-altitude platform station", "HAPS", "Unmanned aerial vehicle", "UAV", "Satellite", "direct-to-device", "D2D", "terrestrial network", "Non-terrestrial network", "direct-to-handset", "D2H", "direct-to-cell", "constellation", "MSS"
 ],
     "act": ["partnership", "implementation", "pilot", "rollout"]
 }]
@@ -43,16 +43,16 @@ COMPANIES = [
 BINARY_EXTS = (".pdf", ".ppt", ".pptx", ".doc", ".docx", ".xls", ".xlsx")
 DOC_EXTS = BINARY_EXTS
 
-MAX_RESULTS_PER_QUERY = 2
+MAX_RESULTS_PER_QUERY = 100
 MAX_TOTAL_RESULTS     = 100
-MAX_FETCH             = 25
+MAX_FETCH             = 35
 CSE_TIMEOUT_SEC       = 30.0
 FETCH_TIMEOUT_SEC     = 20.0
 GEMINI_MODEL          = "gemini-1.5-flash"
 
 # Time filtering knobs
 TIME_MODE = os.getenv("TIME_MODE", "calendar")  # "calendar" or "rolling"
-TIME_DAYS = max(1, int(os.getenv("TIME_DAYS", "30")))  # guard against 0/negatives
+TIME_DAYS = max(1, int(os.getenv("TIME_DAYS", "7")))  # guard against 0/negatives
 TIME_ZONE = "Europe/London"                     # used for calendar mode
 
 # CSE pacing
@@ -162,47 +162,59 @@ def _etld_plus_one(host: str) -> str:
         return ".".join(parts[-2:])
     return host.lower()
 
+
 def score_item(it: dict) -> int:
     title   = (it.get("title") or "")
     snippet = (it.get("snippet") or "")
     url     = (it.get("link")  or "")
-    company = (it.get("company") or "")
+    company = (it.get("company") or "")  # may be ""
 
     parsed = urlparse(url)
     path = (parsed.path or "").lower()
     host = (parsed.netloc or "").lower()
 
     score = 0
-    # Company match
-    if _has_any(title, [company]):      score += 3
-    elif _has_any(snippet, [company]):  score += 1
 
-    # AI/action hints
+    # Company boosts only if provided
+    if company:
+        if _has_any(title, [company]):      score += 3
+        elif _has_any(snippet, [company]):  score += 1
+
+    # AI hints always matter
     if _has_any(title, AI_HINTS):       score += 3
-    if _has_any(title, ACT_HINTS):      score += 3
     if _has_any(snippet, AI_HINTS):     score += 1
+
+    # Action hints (keep, but don’t make them mandatory)
+    if _has_any(title, ACT_HINTS):      score += 2   # was +3
     if _has_any(snippet, ACT_HINTS):    score += 1
 
-    # Action verbs
+    # Action verbs (generic)
     if _has_any(title, ACTION_VERBS):   score += 2
     if _has_any(snippet, ACTION_VERBS): score += 1
 
-    if _is_probably_press_path(path):   score += 1
+    # Pressroom path: stronger boost in AI-only mode
+    if _is_probably_press_path(path):
+        score += 2 if not company else 1
 
-    # Domain-based tweaks (handle subdomains too)
-    if _host_matches_any(host, AGG_DOMAINS): score -= 2
+    # Demote aggregators harder
+    if _host_matches_any(host, AGG_DOMAINS):
+        score -= 3  # was -2
 
-    # Company domain light boost (very fuzzy)
-    company_key = re.sub(r'[^a-z0-9]', '', company.lower())
-    host_key = re.sub(r'[^a-z0-9]', '', host.lower())
-    if company_key and company_key in host_key:
-        score += 1
+    # Company-domain fuzzy boost only if we have a company
+    if company:
+        company_key = re.sub(r'[^a-z0-9]', '', company.lower())
+        host_key = re.sub(r'[^a-z0-9]', '', host.lower())
+        if company_key and company_key in host_key:
+            score += 1
 
-    # Demotions
-    if path.endswith(DOC_EXTS):                      score -= 3
+    # Filetype & noise demotions
+    if path.endswith(DOC_EXTS): score -= 3
     if _has_any(title, BAD_HINTS) or _has_any(snippet, BAD_HINTS): score -= 3
 
     return score
+
+
+
 
 def cap_by_domain(items, per_domain=2):
     counts, out = {}, []
@@ -218,90 +230,122 @@ def cap_by_domain(items, per_domain=2):
 def build_queries() -> List[Tuple[str, str]]:
     g = TERM_GROUPS[0]
     ai_clause  = "(" + " OR ".join(g["ai"])  + ")"
-    act_clause = "(" + " OR ".join(g["act"]) + ")"
-    return [
-        (f'{ai_clause} AND {act_clause} AND "{company}"', company)
-        for company in COMPANIES
-    ]
+
+    return [(ai_clause, None)]
 
 # ───────────────────── Google CSE Search ─────────────────────
+
+from email.utils import parsedate_to_datetime
+
 def _parse_retry_after(val: str | None) -> float | None:
+    """
+    Parse Retry-After as seconds or HTTP-date. Return a non-negative float (seconds) or None.
+    """
     if not val:
         return None
-    val = val.strip()
-    if val.isdigit():
+    s = val.strip()
+    # seconds form
+    if s.isdigit():
         try:
-            return max(0.0, float(val))
+            return max(0.0, float(s))
         except Exception:
             return None
+    # HTTP-date form
     try:
-        dt = parsedate_to_datetime(val)
+        dt = parsedate_to_datetime(s)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        delta = (dt - datetime.now(timezone.utc)).total_seconds()
-        return max(0.0, delta)
+        return max(0.0, (dt - datetime.now(timezone.utc)).total_seconds())
     except Exception:
         return None
 
+
 def google_cse_search(query: str, api_key: str, cx: str,
-                      mode: str = TIME_MODE, days: int = TIME_DAYS) -> list:
-    params = {
+                      mode: str = TIME_MODE, days: int = TIME_DAYS,
+                      max_pages: int = 5) -> list:
+    """
+    Paginated Google Programmable Search.
+    - num is capped at 10 by the API; we page via 'start' (1,11,21,...).
+    - If 'calendar' sort yields a client error, we retry once with dateRestrict.
+    """
+    results = []
+    base_params = {
         "key": api_key,
         "cx": cx,
         "q": query,
-        "num": MAX_RESULTS_PER_QUERY,
+        "num": 10,  # API max; ignore any higher value
     }
 
-    if mode == "calendar":
+    # Primary date filter
+    use_calendar = (mode == "calendar")
+    if use_calendar:
         ldn = ZoneInfo(TIME_ZONE)
         today_ldn = datetime.now(ldn).date()
-        end = today_ldn - timedelta(days=1)               # exclude "today" for stability
+        end = today_ldn - timedelta(days=1)  # exclude "today"
         start = end - timedelta(days=days - 1)
-        params["sort"] = f"date:r:{start:%Y%m%d}:{end:%Y%m%d}"
+        base_params["sort"] = f"date:r:{start:%Y%m%d}:{end:%Y%m%d}"
     else:
-        params["dateRestrict"] = f"d{days}"
+        base_params["dateRestrict"] = f"d{days}"
 
     delay = CSE_BASE_DELAY_SEC
-    for attempt in range(1, CSE_MAX_RETRIES + 1):
+    start_index = 1  # 1-based for CSE
+    attempted_fallback = False
+
+    for page in range(max_pages):
+        params = dict(base_params, start=start_index)
         try:
             with httpx.Client(timeout=CSE_TIMEOUT_SEC, headers=FETCH_HEADERS) as client:
                 resp = client.get("https://www.googleapis.com/customsearch/v1", params=params)
 
+            # Rate limiting / temporary unavailability
             if resp.status_code in (429, 503):
                 ra = resp.headers.get("retry-after")
-                wait = _parse_retry_after(ra)
-                if wait is None:
-                    wait = delay
-                wait = min(wait, 15.0)
-                logging.warning("CSE %s on attempt %d. Waiting %.2fs. URL=%s",
-                                resp.status_code, attempt, wait, resp.request.url)
-                time.sleep(wait)
-                delay *= CSE_BACKOFF_FACTOR
+                wait = _parse_retry_after(ra) or delay
+                time.sleep(min(wait, 15.0))
+                delay = min(delay * CSE_BACKOFF_FACTOR, 15.0)
+                # retry same page after backoff
+                continue
+
+            # Some CSEs reject 'sort' unless enabled; fall back to dateRestrict once.
+            if use_calendar and resp.status_code in (400, 422) and not attempted_fallback:
+                attempted_fallback = True
+                base_params.pop("sort", None)
+                base_params["dateRestrict"] = f"d{days}"
+                # retry this page immediately with rolling restriction
                 continue
 
             if resp.status_code == 403:
-                try:
-                    payload = resp.json()
-                    reason = payload.get("error", {}).get("errors", [{}])[0].get("reason")
-                except Exception:
-                    reason = "forbidden"
-                logging.error("CSE 403 (%s). Skipping query. URL=%s", reason, resp.request.url)
-                return []
+                # Quota/forbidden; return what we have for this query
+                logging.error("CSE 403: %s", resp.text[:300])
+                return results
 
             resp.raise_for_status()
-            return resp.json().get("items", []) or []
+            payload = resp.json()
+            items = payload.get("items", []) or []
+            if not items:
+                break
+
+            results.extend(items)
+
+            # Prepare next page (CSE supports start up to ~91; don’t exceed)
+            start_index += 10
+            if start_index > 91:
+                break
+
+            time.sleep(CSE_BASE_DELAY_SEC + random.random() * 0.3)
 
         except httpx.HTTPStatusError as e:
-            logging.error("CSE HTTP error on attempt %d: %s", attempt, e)
+            logging.warning("CSE HTTP error: %s", e)
             time.sleep(delay)
             delay = min(delay * CSE_BACKOFF_FACTOR, 15.0)
+            continue
         except Exception as e:
-            logging.error("CSE transport error on attempt %d: %s", attempt, e)
+            logging.warning("CSE transport error: %s", e)
             time.sleep(delay)
             delay = min(delay * CSE_BACKOFF_FACTOR, 15.0)
+            continue
 
-    logging.error("CSE failed after %d attempts for query: %s", CSE_MAX_RETRIES, query)
-    return []
+    return results
 
 # ───────────────────── Fetch & Extract ─────────────────────
 UNSAFE_NETS = [
@@ -427,13 +471,14 @@ def llm_relevance_filter(items: list, gemini_key: str,
     model = genai.GenerativeModel(model_name)
 
     prompt_template = Template(
-        "You are a strict filter for news about telecom operators (CSPs) "
-        "partnering with NTN / satellite connectivity players for deployments, pilots, rollouts, or implementations.\n\n"
-        "Return ONLY valid JSON in this exact shape:\n"
-        "{\"relevant\": true/false, \"reason\": \"<=20 words\"}\n\n"
-        "Text to review (truncated):\n"
-        "\"\"\"$article\"\"\""
+      "You are filtering for announcements that EITHER: "
+      "(a) telcos (CSPs) partnering with NTN/satellite providers, OR "
+      "(b) satellite providers announcing deployments/pilots/rollouts that NAME a telco partner.\n\n"
+      "Return ONLY JSON:\n"
+      "{\"relevant\": true/false, \"reason\": \"<=20 words\"}\n\n"
+      "Text:\n\"\"\"$article\"\"\""
     )
+
 
     relevant, irrelevant, errors = [], [], []
     logging.info("Sending %d items to Gemini for relevance", len(items))
@@ -620,7 +665,7 @@ def run_pipeline():
             "rank": idx
         })
 
-    candidates = cap_by_domain(ranked, per_domain=2)[:MAX_FETCH]
+    candidates = cap_by_domain(ranked, per_domain=4)[:MAX_FETCH]
     for it in candidates:
         it["_picked_for_fetch"] = True
         url = it["link"]
