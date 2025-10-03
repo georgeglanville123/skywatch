@@ -48,7 +48,7 @@ MAX_TOTAL_RESULTS     = 100
 MAX_FETCH             = 35
 CSE_TIMEOUT_SEC       = 30.0
 FETCH_TIMEOUT_SEC     = 20.0
-GEMINI_MODEL          = "gemini-1.5-flash"
+GEMINI_MODEL          = "models/gemini-1.5-flash"
 
 # Time filtering knobs
 TIME_MODE = os.getenv("TIME_MODE", "calendar")  # "calendar" or "rolling"
